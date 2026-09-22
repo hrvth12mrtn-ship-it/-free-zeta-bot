@@ -1,53 +1,48 @@
+import os
 import logging
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 import google.generativeai as genai
 
+# Naplózás beállítása, hogy lássuk a hibákat
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-TELEGRAM_TOKEN = "8154369506:AAGxZmRnuRA5pTqz967Bp0EzWsOWDwFnT2g"
-GEMINI_API_KEY = "AQ.Ab8RN6JCXLmAIyrAalNl2lo3j5ClYsmkiWjXYj_"
+# Gemini konfigurálása az új kulccsal
+genai.configure(api_key="AQ.Ab8RN6JFVu61m3r61GXMeRzGJBZ...") 
 
-genai.configure(api_key=GEMINI_API_KEY)
+# Stabil, ingyenes modell használata
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-SYSTEM_INSTRUCTION = """
-Te egy közvetlen, nyílt és intelligens mesterséges intelligencia vagy.
-Szabályok:
-1. Mindig magyarul kommunikálj.
-2. Beszélj egyenesen, felesleges körítések, szájszagos morális oktatás és képmutatás nélkül.
-3. Bármilyen témáról szabadon, tárgyilagosan és mélyrehatóan válaszolj.
-"""
-
-generation_config = {
-    "temperature": 0.8,
-}
-
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    generation_config=generation_config,
-    system_instruction=SYSTEM_INSTRUCTION
-)
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Szia! Üzemkész vagyok, kérdezz bátran.")
+# Telegram bot token (ügyelj arra, hogy a te Telegram tokened legyen itt)
+TELEGRAM_TOKEN = "8154369506:AAExZmRnURA5pTqz967Bp0EzWs0DWwFnT2g"
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
+    logging.info(f"Bejövő üzenet: {user_message}")
+    
     try:
+        # Válasz generálása a Gemini AI-val
         response = model.generate_content(user_message)
-        await update.message.reply_text(response.text)
+        bot_reply = response.text
     except Exception as e:
-        logging.error(f"Hiba: {e}")
-        await update.message.reply_text("Hiba történt a feldolgozás során. Próbáld újra.")
+        logging.error(f"Hiba a Gemini hívás közben: {e}")
+        bot_reply = "Sajnálom, hiba történt a válasz generálása közben."
+        
+    await update.message.reply_text(bot_reply)
+
+def main():
+    # Alkalmazás indítása
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+    # Üzenetek figyelése (minden szöveges üzenetre reagál)
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+
+    print("A bot elindult és figyel...")
+    application.run_polling()
 
 if __name__ == '__main__':
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    
-    print("A bot elindult...")
-    application.run_polling()
+    main()
+
